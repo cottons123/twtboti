@@ -51,6 +51,56 @@ async function canPostTweet() {
     console.log(`[RATE LIMIT] Blocked: ${recent.length} posts in last 24h`);
     return false;
   }
+async function canPostTweet(apiRateInfo = null) {
+  const logRef = ref(db, "tweetLog");
+  const resetRef = ref(db, "tweetRateLimit/resetAt");
+
+  const [snap, resetSnap] = await Promise.all([get(logRef), get(resetRef)]);
+
+  const now = Date.now();
+  let timestamps = [];
+
+  if (snap.exists()) {
+    timestamps = Object.keys(snap.val()).map(ts => Number(ts));
+  }
+
+  const recent = timestamps.filter(ts => now - ts < ONE_DAY_MS);
+
+  // --- INTERNAL LIMIT CHECK ---
+  if (recent.length >= MAX_POSTS_24H) {
+    const lastPost = Math.max(...timestamps);
+    const unlockAt = lastPost + ONE_DAY_MS;
+
+    if (now < unlockAt) {
+      console.log(`[RATE LIMIT] Internal: wait ${(unlockAt - now) / 3600000} hours`);
+      return false;
+    }
+  }
+
+  // --- API RATE LIMIT CHECK (live response) ---
+  if (apiRateInfo) {
+    if (apiRateInfo.remaining === 0) {
+      const resetMs = apiRateInfo.reset * 1000;
+      await set(resetRef, resetMs);
+
+      if (now < resetMs) {
+        console.log(`[RATE LIMIT] API: wait ${(resetMs - now) / 3600000} hours`);
+        return false;
+      }
+    }
+  }
+
+  // --- STORED API RESET CHECK ---
+  if (resetSnap.exists()) {
+    const resetAt = resetSnap.val();
+    if (now < resetAt) {
+      console.log(`[RATE LIMIT] Stored API reset: wait ${(resetAt - now) / 3600000} hours`);
+      return false;
+    }
+  }
+
+  return true;
+}
 
   return true;
 }
