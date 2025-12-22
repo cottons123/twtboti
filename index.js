@@ -41,13 +41,7 @@ async function canPostTweet() {
     timestamps = Object.keys(snap.val()).map(ts => Number(ts));
   }
 
-  // Filter posts from last 24 hours
-  const recent = timestamps.filter(ts => now - ts < ONE_DAY_MS);
 
-  // If under limit, you're good
-  if (recent.length < MAX_POSTS_24H) {
-    return true;
-  }
 // --- Rate Limit: Max 17 posts per 24 hours ---
 const MAX_POSTS_24H = 17;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
