@@ -23,31 +23,6 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 
-// --- Rate Limit: Max 17 posts per 24 hours ---
-const MAX_POSTS_24H = 17;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-async function canPostTweet() {
-  const logRef = ref(db, "tweetLog");
-  const snap = await get(logRef);
-
-  const now = Date.now();
-  let timestamps = [];
-
-  if (snap.exists()) {
-    timestamps = Object.keys(snap.val()).map(ts => Number(ts));
-  }
-
-  const recent = timestamps.filter(ts => now - ts < ONE_DAY_MS);
-
-  if (recent.length >= MAX_POSTS_24H) {
-    console.log(`[RATE LIMIT] Blocked: ${recent.length} posts in last 24h`);
-    return false;
-  }
-
-  return true;
-}
-
 // --- Twitter API Setup ---
 const client = new TwitterApi({
   appKey: process.env.X_APP_KEY,
@@ -209,4 +184,3 @@ postUsernameInviteTweet();
 cron.schedule('0 * * * *', postTweet);
 // Every 20 minutes: username-invite / claim tweet (promotes 5B $NFTFAN claim in TG)
 cron.schedule('*/20 * * * *', postUsernameInviteTweet);
-
