@@ -37,56 +37,6 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 async function canPostTweet() {
   const logRef = ref(db, "tweetLog");
   const snap = await get(logRef);
-async function canPostTweet(apiRateInfo = null) {
-  const logRef = ref(db, "tweetLog");
-  const resetRef = ref(db, "tweetRateLimit/resetAt");
-
-  const [snap, resetSnap] = await Promise.all([get(logRef), get(resetRef)]);
-
-  const now = Date.now();
-  let timestamps = [];
-
-  if (snap.exists()) {
-    timestamps = Object.keys(snap.val()).map(ts => Number(ts));
-  }
-
-  const recent = timestamps.filter(ts => now - ts < ONE_DAY_MS);
-
-  // --- INTERNAL LIMIT CHECK ---
-  if (recent.length >= MAX_POSTS_24H) {
-    const lastPost = Math.max(...timestamps);
-    const unlockAt = lastPost + ONE_DAY_MS;
-
-    if (now < unlockAt) {
-      console.log(`[RATE LIMIT] Internal: wait ${(unlockAt - now) / 3600000} hours`);
-      return false;
-    }
-  }
-
-  // --- EXTERNAL API RATE LIMIT CHECK ---
-  if (apiRateInfo) {
-    if (apiRateInfo.remaining === 0) {
-      const resetMs = apiRateInfo.reset * 1000;
-      await set(resetRef, resetMs);
-
-      if (now < resetMs) {
-        console.log(`[RATE LIMIT] API: wait ${(resetMs - now) / 3600000} hours`);
-        return false;
-      }
-    }
-  }
-
-  // --- CHECK STORED API RESET ---
-  if (resetSnap.exists()) {
-    const resetAt = resetSnap.val();
-    if (now < resetAt) {
-      console.log(`[RATE LIMIT] Stored API reset: wait ${(resetAt - now) / 3600000} hours`);
-      return false;
-    }
-  }
-
-  return true;
-}
 
   const now = Date.now();
   let timestamps = [];
