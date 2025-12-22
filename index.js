@@ -48,22 +48,20 @@ async function canPostTweet() {
   if (recent.length < MAX_POSTS_24H) {
     return true;
   }
+// --- Rate Limit: Max 17 posts per 24 hours ---
+const MAX_POSTS_24H = 17;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-  // --- NEW: Enforce 24h lock from last post ---
-  const lastPost = Math.max(...timestamps);
-  const unlockAt = lastPost + ONE_DAY_MS;
+async function canPostTweet() {
+  const logRef = ref(db, "tweetLog");
+  const snap = await get(logRef);
 
-  if (now < unlockAt) {
-    const waitMs = unlockAt - now;
-    const hours = (waitMs / 3600000).toFixed(2);
+  const now = Date.now();
+  let timestamps = [];
 
-    console.log(`[RATE LIMIT] Hit 17 posts. Must wait ${hours} hours until posting again.`);
-    return false;
+  if (snap.exists()) {
+    timestamps = Object.keys(snap.val()).map(ts => Number(ts));
   }
-
-  return true;
-}
-
 
   const recent = timestamps.filter(ts => now - ts < ONE_DAY_MS);
 
