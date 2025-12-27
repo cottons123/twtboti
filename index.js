@@ -30,8 +30,8 @@ const client = new TwitterApi({
   accessToken: process.env.X_ACCESS_TOKEN,
   accessSecret: process.env.X_ACCESS_SECRET
 });
-// --- Rate Limit: Max 17 posts per 24 hours ---
-const MAX_POSTS_24H = 17;
+// --- Rate Limit: Max 10 posts per 24 hours ---
+const MAX_POSTS_24H = 10;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 async function canPostTweet() {
@@ -183,10 +183,8 @@ function getRandomTweetText() {
 
 // --- Tweet on Launch ---
 postTweet();
-postUsernameInviteTweet();
+
 
 // --- Cron Jobs ---
 // Every hour: general NFTFAN promo tweet
 cron.schedule('0 * * * *', postTweet);
-// Every 20 minutes: username-invite / claim tweet (promotes 5B $NFTFAN claim in TG)
-cron.schedule('*/20 * * * *', postUsernameInviteTweet);
