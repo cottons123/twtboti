@@ -162,26 +162,7 @@ function getRandomTweetText() {
   return template.replace(/\{bonus\}/g, bonus);
 }
 
-// --- Fetch 6 Usernames from Firebase & Mark as "done" ---
-async function getUsernamesFromFirebase() {
-  try {
-    const snap = await get(ref(db, "groups"));
-    if (!snap.exists()) throw new Error("No groups found");
-    const groups = snap.val();
-    const available = Object.entries(groups).filter(([_, g]) =>
-      g.status !== "done" &&
-      Array.isArray(g.usernames) &&
-      g.usernames.length > 0
-    );
-    if (available.length === 0) return [];
-    
-    let selected = [];
-    const usedKeys = [];
-    for (const [key, group] of available) {
-      if (selected.length >= 6) break;
-      selected.push(...group.usernames);
-      usedKeys.push(key);
-    }
+
     selected = selected.slice(0, 6);
 
     // Mark as done
@@ -196,32 +177,9 @@ async function getUsernamesFromFirebase() {
   }
 }
 
-// --- Post Random Promo Tweet ---
-async function postTweet() {
-  try {
-    const text = getRandomTweetText();
-    const { data } = await client.v2.tweet(text);
-    console.log(`[${new Date().toISOString()}] Tweeted: ${data.text} (ID: ${data.id})`);
-  } catch (error) {
-    console.error('Promo tweet failed:', error);
-  }
-}
 
-// --- Post Username Invite Tweet every 20 minutes ---
-async function postUsernameInviteTweet() {
-  try {
-    const usernames = await getUsernamesFromFirebase();
-    if (usernames.length === 0) {
-      console.log('No usernames available for the username invite tweet.');
-      return;
-    }
-    const tweetText = `Hello, ${usernames.join(' ')} you are invited to claim 5 Billion free $NFTFAN TOKENS, just drop your evm wallet in our TG group: ${TG_LINK}`;
-    const { data } = await client.v2.tweet(tweetText);
-    console.log(`[${new Date().toISOString()}] Username Invite Tweet: ${data.text} (ID: ${data.id})`);
-  } catch (error) {
-    console.error('Username invite tweet failed:', error);
-  }
-}
+
+
 
 // --- Tweet on Launch ---
 postTweet();
