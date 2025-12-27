@@ -4,13 +4,13 @@ import { TwitterApi } from 'twitter-api-v2';
 
 // --- Firebase ---
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, get, update } from "firebase/database";
+import { getDatabase, ref, get, update, set } from "firebase/database";
 
 // Telegram, promo, and quickbuy links
 const TG_LINK = "https://t.me/nftfanstokens";
 const QUICKBUY_LINK = "https://www.nftfanstoken.com/quickbuynft/";
 
-// --- Firebase Setup (update if needed) ---
+// --- Firebase Setup ---
 const firebaseConfig = {
   apiKey: "AIzaSyC6wYBu-KOXkDmB-84_7OPtY71zBX4FzRY",
   authDomain: "newnft-47bd7.firebaseapp.com",
@@ -30,27 +30,12 @@ const client = new TwitterApi({
   accessToken: process.env.X_ACCESS_TOKEN,
   accessSecret: process.env.X_ACCESS_SECRET
 });
+
 // --- Rate Limit: Max 10 posts per 24 hours ---
 const MAX_POSTS_24H = 10;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-async function canPostTweet() {
-  const logRef = ref(db, "tweetLog");
-  const snap = await get(logRef);
-
-  const now = Date.now();
-  let timestamps = [];
-
-  if (snap.exists()) {
-    timestamps = Object.keys(snap.val()).map(ts => Number(ts));
-  }
-
-  const recent = timestamps.filter(ts => now - ts < ONE_DAY_MS);
-
-  if (recent.length >= MAX_POSTS_24H) {
-    console.log(`[RATE LIMIT] Blocked: ${recent.length} posts in last 24h`);
-    return false;
-  }
+// --- Rate Limit Logic ---
 async function canPostTweet(apiRateInfo = null) {
   const logRef = ref(db, "tweetLog");
   const resetRef = ref(db, "tweetRateLimit/resetAt");
@@ -66,7 +51,7 @@ async function canPostTweet(apiRateInfo = null) {
 
   const recent = timestamps.filter(ts => now - ts < ONE_DAY_MS);
 
-  // --- INTERNAL LIMIT CHECK ---
+  // Internal limit
   if (recent.length >= MAX_POSTS_24H) {
     const lastPost = Math.max(...timestamps);
     const unlockAt = lastPost + ONE_DAY_MS;
@@ -77,7 +62,7 @@ async function canPostTweet(apiRateInfo = null) {
     }
   }
 
-  // --- API RATE LIMIT CHECK (live response) ---
+  // API rate limit (live)
   if (apiRateInfo) {
     if (apiRateInfo.remaining === 0) {
       const resetMs = apiRateInfo.reset * 1000;
@@ -90,7 +75,7 @@ async function canPostTweet(apiRateInfo = null) {
     }
   }
 
-  // --- STORED API RESET CHECK ---
+  // Stored API reset
   if (resetSnap.exists()) {
     const resetAt = resetSnap.val();
     if (now < resetAt) {
@@ -102,11 +87,7 @@ async function canPostTweet(apiRateInfo = null) {
   return true;
 }
 
-  return true;
-}
-
-// --- TEMPLATES for HOURLY TWEET ---
-// Generate a random token bonus string (e.g. "5B $NFTFAN", "500M $NFTFAN", "1B $NFTFAN")
+// --- Random Bonus Generator ---
 function getRandomTokenBonus() {
   const choices = [
     "100M $NFTFAN",
@@ -114,14 +95,15 @@ function getRandomTokenBonus() {
     "500M $NFTFAN",
     "1B $NFTFAN",
     "2B $NFTFAN",
-    "5B $NFTFAN",   // matches your claim amount used in other places
+    "5B $NFTFAN",
     "10B $NFTFAN"
   ];
   return choices[Math.floor(Math.random() * choices.length)];
 }
 
+// --- Tweet Templates ---
 const TEMPLATES = [
-   "🚀 Win {bonus} while learning how Subfan hunters track rare drops! RT, Like & Follow @nftfanstoken. Drop wallet 👇",
+  "🚀 Win {bonus} while learning how Subfan hunters track rare drops! RT, Like & Follow @nftfanstoken. Drop wallet 👇",
   "💸 Claim {bonus} + discover how NFT senders keep the ecosystem alive. RT, Like, tag a friend, Follow @nftfanstoken, drop wallet!",
   "🎁 Not just a token — NFTFAN powers jobs in the community. Airdrop {bonus}! Follow + RT, drop wallet to join.",
   "⚡ Lightning drop {bonus}! But remember: Subfan works as a subscription layer for NFT utilities. RT, Like, Follow, drop wallet!",
@@ -155,36 +137,34 @@ const TEMPLATES = [
   "Drop wallet, RT, Like, Follow @nftfanstoken for {bonus} + discover NFTFAN jobs + Subfan surprises 🚀"
 ];
 
-// Get a random promo tweet
+// --- Pick Random Template ---
 function getRandomTweetText() {
   const template = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)];
   const bonus = getRandomTokenBonus();
   return template.replace(/\{bonus\}/g, bonus);
 }
 
+// --- Tweet Function ---
+async function postTweet() {
+  if (!(await canPostTweet())) return;
 
-    selected = selected.slice(0, 6);
+  const text = getRandomTweetText();
 
-    // Mark as done
-    const updates = {};
-    usedKeys.forEach(k => updates[`groups/${k}/status`] = "done");
-    if (Object.keys(updates).length) await update(ref(db), updates);
+  try {
+    const response = await client.v2.tweet(text);
 
-    return selected;
-  } catch (error) {
-    console.error('Could not fetch usernames:', error);
-    return [];
+    // Log timestamp
+    const ts = Date.now();
+    await set(ref(db, `tweetLog/${ts}`), true);
+
+    console.log("Tweet posted:", text);
+  } catch (err) {
+    console.error("Tweet failed:", err);
   }
 }
 
-
-
-
-
-// --- Tweet on Launch ---
+// --- Tweet Immediately on Launch ---
 postTweet();
 
-
-// --- Cron Jobs ---
-// Every hour: general NFTFAN promo tweet
+// --- Cron: Every Hour ---
 cron.schedule('0 * * * *', postTweet);
